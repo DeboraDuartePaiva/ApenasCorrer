@@ -1,7 +1,7 @@
 // Service Worker para ApenasCorrer PWA
 // Permite funcionamento offline completo
 
-const CACHE_NAME = 'apenascorrer-v2';
+const CACHE_NAME = 'apenascorrer-v3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

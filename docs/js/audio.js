@@ -88,6 +88,50 @@ class RunningAudioEngine {
     this.speechSynthesis.speak(utterance);
   }
 
+  // Reproduz arquivo de áudio MP3 gravado com fallback para síntese de voz (TTS)
+  playVoiceFile(type, fallbackText) {
+    this.init();
+
+    // Cancela síntese de fala em andamento para não encavalar
+    if (this.speechSynthesis) {
+      this.speechSynthesis.cancel();
+    }
+
+    // Mapeamento dos nomes de arquivo em português
+    const fileNameMap = {
+      warmup: 'aquecimento',
+      walk: 'caminhar',
+      run: 'correr',
+      challenge: 'desafio',
+      cooldown: 'desaquecimento',
+      stretch: 'alongar',
+      finish: 'fim'
+    };
+
+    const fileName = fileNameMap[type] || type;
+    const audioPath = `./assets/audio/${fileName}.mp3`;
+    const audio = new Audio(audioPath);
+    audio.volume = this.voiceVolume;
+
+    // Efeito de Ducking na música
+    this.duckMusic(true);
+
+    audio.onended = () => {
+      this.duckMusic(false);
+    };
+
+    audio.onerror = () => {
+      // Caso o arquivo MP3 não exista no servidor/celular (Erro 404), usa o TTS de fallback
+      console.warn(`[AudioEngine] Áudio real não encontrado em ${audioPath}. Usando voz de síntese (TTS) de segurança.`);
+      this.speak(fallbackText);
+    };
+
+    audio.play().catch(err => {
+      console.warn("[AudioEngine] Reprodução do MP3 bloqueada ou com erro. Usando TTS.", err);
+      this.speak(fallbackText);
+    });
+  }
+
   // Abaixa o volume da música (Ducking effect)
   duckMusic(isDucked) {
     if (!this.ctx || !this.musicGainNode) return;

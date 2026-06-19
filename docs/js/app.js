@@ -488,7 +488,7 @@ function finishWorkout() {
   audioEngine.stopMusic();
   
   // Mensagem final falada
-  audioEngine.speak("Parabéns! Você completou com sucesso o treino de hoje! Muito bom trabalho!");
+  audioEngine.playVoiceFile("finish", "Parabéns! Você completou com sucesso o treino de hoje! Muito bom trabalho!");
   
   // Salva no progresso
   const workoutKey = `w${currentWorkout.week}-d${currentWorkout.day}`;
@@ -544,7 +544,7 @@ function playCoachAnnouncement(interval) {
       announcement = `Etapa: ${interval.name} por ${timeStr}.`;
   }
   
-  audioEngine.speak(announcement);
+  audioEngine.playVoiceFile(interval.type, announcement);
 }
 
 // Beep sonoro simples usando Web Audio API do motor
@@ -769,7 +769,7 @@ if (paywallDOM.modal) {
     
     // Feedback de voz e visual
     audioEngine.init();
-    audioEngine.speak("Parabéns! Seu pagamento foi confirmado. Agora você é um membro premium do Apenas Correr! Todos os treinos foram liberados.");
+    audioEngine.playVoiceFile("payment_success", "Parabéns! Seu pagamento foi confirmado. Agora você é um membro premium do Apenas Correr! Todos os treinos foram liberados.");
     
     showToast('Acesso Premium Ativado! Bons treinos!');
     renderCalendar();
