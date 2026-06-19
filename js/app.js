@@ -1,6 +1,8 @@
 // Controlador Principal do App "ApenasCorrer"
 import { runningPlan } from './data.js';
 import { audioEngine } from './audio.js';
+import { supabase, isSupabaseConfigured } from './supabase-config.js';
+
 
 // Estado Global do App
 let currentWorkout = null;
@@ -11,6 +13,9 @@ let isWorkoutRunning = false;
 let completedWorkouts = [];
 let activePhase = 1;
 let isPremium = false;
+let currentUser = null; // Guarda dados do usuário logado (Supabase ou Demo)
+let authMode = 'login'; // 'login' ou 'register'
+
 
 
 // Mapeamento de cores CSS por tipo de intervalo para o timer
@@ -63,21 +68,38 @@ const dom = {
   statsCurrentPhase: document.getElementById('stats-current-phase'),
   historyListContainer: document.getElementById('history-list-container'),
   btnResetProgress: document.getElementById('btn-reset-progress'),
-  toast: document.getElementById('toast-message')
+  toast: document.getElementById('toast-message'),
+  
+  // Auth DOM
+  authView: document.getElementById('view-auth'),
+  authForm: document.getElementById('auth-form'),
+  authEmail: document.getElementById('auth-email'),
+  authPassword: document.getElementById('auth-password'),
+  btnAuthSubmit: document.getElementById('btn-auth-submit'),
+  btnToggleAuth: document.getElementById('btn-toggle-auth'),
+  authToggleText: document.getElementById('auth-toggle-text'),
+  authTitle: document.getElementById('auth-title'),
+  authSubtitle: document.getElementById('auth-subtitle'),
+  authWarning: document.getElementById('auth-config-warning'),
+  btnAuthGuest: document.getElementById('btn-auth-guest'),
+  userProfileCard: document.getElementById('user-profile-card'),
+  userEmailDisplay: document.getElementById('user-email-display'),
+  btnAuthLogout: document.getElementById('btn-auth-logout'),
+  bottomNav: document.querySelector('.bottom-nav')
 };
+
 
 // -------------------------------------------------------------
 // Inicialização do Aplicativo
 // -------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
-  loadProgress();
+  setupAuth();
   setupNavigation();
   setupPhaseSelectors();
   setupPlayerControls();
-  renderCalendar();
-  updateProgressStats();
   registerServiceWorker();
 });
+
 
 // -------------------------------------------------------------
 // Registro do Service Worker para PWA Offline
@@ -96,6 +118,13 @@ function registerServiceWorker() {
 // Persistência de Progresso (Local Storage)
 // -------------------------------------------------------------
 function loadProgress() {
+  // Se estiver logado via Supabase, o carregamento é feito da nuvem.
+  // Caso contrário, carrega dados do localStorage (para Visitantes ou Demo)
+  if (currentUser && isSupabaseConfigured) {
+    fetchCloudProgress();
+    return;
+  }
+
   const saved = localStorage.getItem('apenascorrer_progress');
   if (saved) {
     try {
@@ -105,34 +134,53 @@ function loadProgress() {
     }
   }
   isPremium = localStorage.getItem('apenascorrer_premium') === 'true';
+  renderCalendar();
+  updateProgressStats();
 }
 
 function saveProgress(workoutKey) {
-  if (!completedWorkouts.includes(workoutKey)) {
-    completedWorkouts.push({
-      key: workoutKey,
-      date: new Date().toLocaleDateString('pt-BR'),
-      phase: currentWorkout.phase,
-      week: currentWorkout.week,
-      day: currentWorkout.dayName
-    });
-    localStorage.setItem('apenascorrer_progress', JSON.stringify(completedWorkouts));
+  const newWorkout = {
+    key: workoutKey,
+    date: new Date().toLocaleDateString('pt-BR'),
+    phase: currentWorkout.phase,
+    week: currentWorkout.week,
+    day: currentWorkout.dayName
+  };
+
+  if (!completedWorkouts.some(item => item.key === workoutKey)) {
+    completedWorkouts.push(newWorkout);
+    
+    // Se logado no Supabase, salva na nuvem
+    if (currentUser && isSupabaseConfigured) {
+      saveCloudProgress(workoutKey);
+    } else {
+      localStorage.setItem('apenascorrer_progress', JSON.stringify(completedWorkouts));
+    }
+    
     updateProgressStats();
     renderCalendar();
   }
 }
+
 
 function resetProgress() {
   if (confirm('Tem certeza de que deseja resetar todo o seu progresso? Esta ação não pode ser desfeita.')) {
     completedWorkouts = [];
     isPremium = false;
-    localStorage.removeItem('apenascorrer_progress');
-    localStorage.removeItem('apenascorrer_premium');
+    
+    if (currentUser && isSupabaseConfigured) {
+      resetCloudProgress();
+    } else {
+      localStorage.removeItem('apenascorrer_progress');
+      localStorage.removeItem('apenascorrer_premium');
+    }
+    
     showToast('Progresso resetado com sucesso!');
     updateProgressStats();
     renderCalendar();
   }
 }
+
 
 // -------------------------------------------------------------
 // Navegação entre Telas (Tabs)
@@ -146,9 +194,17 @@ function setupNavigation() {
   });
   
   dom.btnResetProgress.addEventListener('click', resetProgress);
+  dom.btnAuthLogout.addEventListener('click', logoutUser);
 }
 
+
 function switchView(viewId) {
+  // Bloqueia navegação se o usuário não estiver autenticado e não for visitante
+  if (!currentUser && localStorage.getItem('apenascorrer_guest') !== 'true' && viewId !== 'view-auth') {
+    switchView('view-auth');
+    return;
+  }
+
   // Oculta todas as views e remove classe active da nav
   document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
   dom.navItems.forEach(nav => nav.classList.remove('active'));
@@ -163,12 +219,19 @@ function switchView(viewId) {
   // Ajusta indicador de fase no topo dependendo da view
   if (viewId === 'view-workouts') {
     updateTopPhaseIndicator(activePhase);
+    dom.bottomNav.style.display = 'flex';
   } else if (viewId === 'view-player' && currentWorkout) {
     dom.activePhaseIndicator.textContent = `Em Treino: Sem. ${currentWorkout.week}`;
+    dom.bottomNav.style.display = 'flex';
   } else if (viewId === 'view-progress') {
     dom.activePhaseIndicator.textContent = 'Meu Progresso';
+    dom.bottomNav.style.display = 'flex';
+  } else if (viewId === 'view-auth') {
+    dom.activePhaseIndicator.textContent = 'ApenasCorrer';
+    dom.bottomNav.style.display = 'none'; // Esconde menu no login
   }
 }
+
 
 function updateTopPhaseIndicator(phaseNum) {
   if (phaseNum == 1) dom.activePhaseIndicator.textContent = 'Fase 1 - Meta 2Km';
@@ -694,7 +757,14 @@ if (paywallDOM.modal) {
   // Simular confirmação de pagamento Pix
   paywallDOM.btnConfirm.addEventListener('click', () => {
     isPremium = true;
-    localStorage.setItem('apenascorrer_premium', 'true');
+    
+    // Salva status premium
+    if (currentUser && isSupabaseConfigured) {
+      updateCloudPremium(true);
+    } else {
+      localStorage.setItem('apenascorrer_premium', 'true');
+    }
+    
     closePaywall();
     
     // Feedback de voz e visual
@@ -706,4 +776,262 @@ if (paywallDOM.modal) {
     updateProgressStats();
   });
 }
+
+// -------------------------------------------------------------
+// Lógica de Autenticação (Supabase ou Demo Local)
+// -------------------------------------------------------------
+function setupAuth() {
+  // Alerta caso Supabase não esteja configurado
+  if (!isSupabaseConfigured) {
+    dom.authWarning.style.display = 'block';
+  }
+
+  // Toggles de layout Login <-> Cadastro
+  dom.btnToggleAuth.addEventListener('click', () => {
+    if (authMode === 'login') {
+      authMode = 'register';
+      dom.authTitle.textContent = 'Criar uma Conta';
+      dom.authSubtitle.textContent = 'Registre-se para sincronizar seus treinos na nuvem';
+      dom.btnAuthSubmit.textContent = 'Cadastrar';
+      dom.authToggleText.textContent = 'Já tem uma conta?';
+      dom.btnToggleAuth.textContent = 'Entre aqui';
+    } else {
+      authMode = 'login';
+      dom.authTitle.textContent = 'Entrar na sua Conta';
+      dom.authSubtitle.textContent = 'Sincronize seus treinos e acesse o treinador na nuvem';
+      dom.btnAuthSubmit.textContent = 'Entrar';
+      dom.authToggleText.textContent = 'Não tem uma conta?';
+      dom.btnToggleAuth.textContent = 'Cadastre-se';
+    }
+  });
+
+  // Ação de Continuar como Visitante
+  dom.btnAuthGuest.addEventListener('click', () => {
+    localStorage.setItem('apenascorrer_guest', 'true');
+    currentUser = null;
+    showToast('Acessando como Visitante (Fase 1 gratuita)');
+    loadProgress();
+    switchView('view-workouts');
+  });
+
+  // Submit de login/cadastro
+  dom.authForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = dom.authEmail.value.trim();
+    const password = dom.authPassword.value;
+
+    if (isSupabaseConfigured) {
+      // Login Real via Supabase
+      if (authMode === 'login') {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) {
+          showToast(`Erro ao entrar: ${error.message}`);
+        } else {
+          showToast('Login efetuado com sucesso!');
+        }
+      } else {
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) {
+          showToast(`Erro ao cadastrar: ${error.message}`);
+        } else {
+          if (data.session) {
+            showToast('Cadastro realizado e conectado!');
+          } else {
+            showToast('Cadastro realizado! Confirme seu e-mail para entrar.');
+          }
+        }
+      }
+    } else {
+      // Modo Demo (Simulado)
+      if (authMode === 'login') {
+        // Simula login fictício
+        localStorage.setItem('apenascorrer_demo_user', email);
+        localStorage.removeItem('apenascorrer_guest');
+        showToast('Login Simulado! (Modo Demo)');
+        checkSession();
+      } else {
+        // Simula cadastro fictício
+        localStorage.setItem('apenascorrer_demo_user', email);
+        localStorage.removeItem('apenascorrer_guest');
+        localStorage.setItem('apenascorrer_premium', 'false'); // Novo usuário começa grátis
+        showToast('Cadastro Simulado! (Modo Demo)');
+        checkSession();
+      }
+    }
+  });
+
+  // Verifica sessão ativa
+  checkSession();
+}
+
+function checkSession() {
+  if (isSupabaseConfigured) {
+    // Escuta mudanças de sessão reais no Supabase
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      handleAuthSession(session);
+    });
+    supabase.auth.onAuthStateChange((_event, session) => {
+      handleAuthSession(session);
+    });
+  } else {
+    // Escuta sessão simulada
+    const demoUser = localStorage.getItem('apenascorrer_demo_user');
+    if (demoUser) {
+      handleAuthSession({ user: { email: demoUser } });
+    } else if (localStorage.getItem('apenascorrer_guest') === 'true') {
+      handleAuthSession(null);
+    } else {
+      switchView('view-auth');
+    }
+  }
+}
+
+function handleAuthSession(session) {
+  if (session && session.user) {
+    currentUser = session.user;
+    
+    // Atualiza UI de Perfil
+    dom.userProfileCard.style.display = 'flex';
+    dom.userEmailDisplay.textContent = currentUser.email;
+    
+    // Limpa estado de visitante
+    localStorage.removeItem('apenascorrer_guest');
+    
+    // Carrega dados da nuvem ou localStorage
+    loadProgress();
+    switchView('view-workouts');
+  } else {
+    currentUser = null;
+    dom.userProfileCard.style.display = 'none';
+    
+    if (localStorage.getItem('apenascorrer_guest') === 'true') {
+      loadProgress();
+      switchView('view-workouts');
+    } else {
+      switchView('view-auth');
+    }
+  }
+}
+
+async function logoutUser() {
+  if (isSupabaseConfigured) {
+    await supabase.auth.signOut();
+  } else {
+    localStorage.removeItem('apenascorrer_demo_user');
+  }
+  localStorage.removeItem('apenascorrer_guest');
+  currentUser = null;
+  completedWorkouts = [];
+  isPremium = false;
+  
+  showToast('Desconectado com sucesso.');
+  switchView('view-auth');
+}
+
+// -------------------------------------------------------------
+// Sincronização em Nuvem do Supabase (Apenas se configurado)
+// -------------------------------------------------------------
+async function fetchCloudProgress() {
+  if (!currentUser || !isSupabaseConfigured) return;
+
+  try {
+    // 1. Busca perfil (Premium)
+    const { data: profile, error: pError } = await supabase
+      .from('profiles')
+      .select('is_premium')
+      .eq('id', currentUser.id)
+      .single();
+
+    if (!pError && profile) {
+      isPremium = profile.is_premium;
+    } else if (pError && pError.code === 'PGRST116') {
+      // Perfil ainda não criado pela trigger, cria manualmente ou trata
+      isPremium = false;
+    }
+
+    // 2. Busca progresso concluído
+    const { data: progressRows, error: prError } = await supabase
+      .from('progress')
+      .select('workout_key, completed_at')
+      .eq('user_id', currentUser.id);
+
+    if (!prError && progressRows) {
+      completedWorkouts = progressRows.map(row => {
+        // Encontra o treino mapeado em data.js para recriar as informações na UI
+        let workoutData = null;
+        let weekNum = 0;
+        let dayName = "";
+        let phase = 1;
+
+        for (const w of runningPlan) {
+          const matched = w.workouts.find(d => `w${w.week}-d${d.day}` === row.workout_key);
+          if (matched) {
+            workoutData = matched;
+            weekNum = w.week;
+            dayName = matched.dayName;
+            phase = w.phase;
+            break;
+          }
+        }
+
+        return {
+          key: row.workout_key,
+          date: new Date(row.completed_at).toLocaleDateString('pt-BR'),
+          phase: phase,
+          week: weekNum,
+          day: dayName
+        };
+      });
+    }
+
+    renderCalendar();
+    updateProgressStats();
+  } catch (e) {
+    console.error('Erro ao sincronizar com nuvem:', e);
+  }
+}
+
+async function saveCloudProgress(workoutKey) {
+  if (!currentUser || !isSupabaseConfigured) return;
+  
+  try {
+    await supabase
+      .from('progress')
+      .insert([{ user_id: currentUser.id, workout_key: workoutKey }]);
+  } catch (e) {
+    console.error('Erro ao salvar progresso na nuvem:', e);
+  }
+}
+
+async function resetCloudProgress() {
+  if (!currentUser || !isSupabaseConfigured) return;
+
+  try {
+    // Remove treinos
+    await supabase
+      .from('progress')
+      .delete()
+      .eq('user_id', currentUser.id);
+
+    // Reseta premium
+    await updateCloudPremium(false);
+  } catch (e) {
+    console.error('Erro ao resetar dados na nuvem:', e);
+  }
+}
+
+async function updateCloudPremium(status) {
+  if (!currentUser || !isSupabaseConfigured) return;
+
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .upsert({ id: currentUser.id, is_premium: status });
+      
+    if (error) console.error('Erro ao atualizar premium:', error);
+  } catch (e) {
+    console.error('Erro ao salvar status premium na nuvem:', e);
+  }
+}
+
 

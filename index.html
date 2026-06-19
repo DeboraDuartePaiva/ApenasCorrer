@@ -25,8 +25,51 @@
       <div class="current-status" id="active-phase-indicator">Fase 1 - 2Km</div>
     </header>
 
+    <!-- VIEW 0: AUTENTICAÇÃO (LOGIN / CADASTRO) -->
+    <main id="view-auth" class="view">
+      <div class="auth-container">
+        <div class="auth-logo">
+          <svg viewBox="0 0 24 24">
+            <path d="M21,12C21,12 18,17 14,17C10,17 11,13 8,13C5,13 3,15 3,15M21,12C21,12 18,9 14,9C10,9 11,13 8,13C5,13 3,11 3,11M16,5L19,8M12,5L15,8M8,5L11,8M21,12C21,13.66 19.66,15 18,15C16.34,15 15,13.66 15,12C15,10.34 16.34,9 18,9C19.66,9 21,10.34 21,12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+          <span>ApenasCorrer</span>
+        </div>
+        
+        <h3 id="auth-title">Entrar na sua Conta</h3>
+        <p class="auth-subtitle" id="auth-subtitle">Sincronize seus treinos e acesse o treinador na nuvem</p>
+
+        <!-- Alerta de Chaves Supabase Pendentes -->
+        <div class="auth-warning-box" id="auth-config-warning" style="display: none;">
+          ⚠️ <strong>Modo de Demonstração:</strong> O Supabase não está configurado. Cadastre-se ou entre com qualquer e-mail fictício de teste (sem validação real na nuvem).
+        </div>
+
+        <form id="auth-form" class="auth-form">
+          <div class="form-group">
+            <label for="auth-email">E-mail</label>
+            <input type="email" id="auth-email" required placeholder="seuemail@exemplo.com">
+          </div>
+          <div class="form-group">
+            <label for="auth-password">Senha</label>
+            <input type="password" id="auth-password" required minlength="6" placeholder="Mínimo 6 caracteres">
+          </div>
+          
+          <button type="submit" class="btn-auth-submit" id="btn-auth-submit">Entrar</button>
+        </form>
+
+        <div class="auth-toggle">
+          <span id="auth-toggle-text">Não tem uma conta?</span>
+          <button class="btn-link" id="btn-toggle-auth">Cadastre-se</button>
+        </div>
+
+        <div class="auth-divider">ou</div>
+
+        <button class="btn-guest" id="btn-auth-guest">Continuar como Visitante</button>
+        <p class="guest-tip">Seu progresso será salvo localmente e você acessará a Fase 1 grátis.</p>
+      </div>
+    </main>
+
     <!-- VIEW 1: CALENDÁRIO DE TREINOS -->
-    <main id="view-workouts" class="view active">
+    <main id="view-workouts" class="view">
       <!-- Seletor de Fases -->
       <div class="phase-selector">
         <button class="phase-btn active" data-phase="1">Fase 1: 2Km</button>
@@ -113,6 +156,15 @@
 
     <!-- VIEW 3: HISTÓRICO E PROGRESSO -->
     <main id="view-progress" class="view">
+      <!-- Card do Usuário Logado -->
+      <div class="user-profile-card" id="user-profile-card" style="display: none;">
+        <div class="user-profile-info">
+          <span class="user-email-label">Conectado como:</span>
+          <span class="user-email" id="user-email-display">email@exemplo.com</span>
+        </div>
+        <button class="btn-logout" id="btn-auth-logout">Sair da Conta</button>
+      </div>
+
       <!-- Grid de Estatísticas -->
       <div class="stats-grid">
         <div class="stat-card">
