@@ -10,6 +10,8 @@ let intervalTimerId = null;
 let isWorkoutRunning = false;
 let completedWorkouts = [];
 let activePhase = 1;
+let isPremium = false;
+
 
 // Mapeamento de cores CSS por tipo de intervalo para o timer
 const STATE_CLASSES = {
@@ -102,6 +104,7 @@ function loadProgress() {
       completedWorkouts = [];
     }
   }
+  isPremium = localStorage.getItem('apenascorrer_premium') === 'true';
 }
 
 function saveProgress(workoutKey) {
@@ -122,7 +125,9 @@ function saveProgress(workoutKey) {
 function resetProgress() {
   if (confirm('Tem certeza de que deseja resetar todo o seu progresso? Esta ação não pode ser desfeita.')) {
     completedWorkouts = [];
+    isPremium = false;
     localStorage.removeItem('apenascorrer_progress');
+    localStorage.removeItem('apenascorrer_premium');
     showToast('Progresso resetado com sucesso!');
     updateProgressStats();
     renderCalendar();
@@ -205,12 +210,20 @@ function renderCalendar() {
       const workoutKey = `w${weekData.week}-d${workout.day}`;
       const isCompleted = completedWorkouts.some(item => item.key === workoutKey);
       
+      // Bloqueia Fase 2 e 3 (Semana 5 em diante) se não for premium
+      const isLocked = weekData.phase >= 2 && !isPremium;
+      
       const card = document.createElement('div');
-      card.className = `workout-card ${isCompleted ? 'completed' : ''}`;
+      card.className = `workout-card ${isCompleted ? 'completed' : ''} ${isLocked ? 'locked' : ''}`;
       
       // Calcula duração total do treino ativo em minutos
       const totalSeconds = workout.intervals.reduce((acc, curr) => acc + curr.duration, 0);
       const totalMinutes = Math.ceil(totalSeconds / 60);
+      
+      let buttonLabel = isCompleted ? 'Refazer Treino' : 'Iniciar Treino';
+      if (isLocked) {
+        buttonLabel = '🔒 Desbloquear';
+      }
       
       card.innerHTML = `
         <div class="card-header">
@@ -223,14 +236,18 @@ function renderCalendar() {
           <div class="card-footer">
             <span class="duration-tag">⏱️ ~${totalMinutes} min</span>
             <button class="btn-start" data-week="${weekData.week}" data-day="${workout.day}">
-              ${isCompleted ? 'Refazer Treino' : 'Iniciar Treino'}
+              ${buttonLabel}
             </button>
           </div>
       `;
       
-      // Vincula clique para iniciar treino
+      // Vincula clique para iniciar ou desbloquear treino
       card.querySelector('.btn-start').addEventListener('click', () => {
-        startActiveWorkout(weekData.week, workout.day);
+        if (isLocked) {
+          openPaywall();
+        } else {
+          startActiveWorkout(weekData.week, workout.day);
+        }
       });
       
       weekSec.appendChild(card);
@@ -565,13 +582,19 @@ function updateProgressStats() {
   const total = completedWorkouts.length;
   dom.statsTotalRuns.textContent = total;
   
-  // Determina a fase mais recente com base no progresso
-  let currentPhase = 1;
-  if (completedWorkouts.length > 0) {
-    const phases = completedWorkouts.map(w => w.phase);
-    currentPhase = Math.max(...phases);
+  // Determina a assinatura/fase com destaque para Premium
+  if (isPremium) {
+    dom.statsCurrentPhase.textContent = 'Premium 👑';
+    dom.statsCurrentPhase.style.color = '#ffd600';
+  } else {
+    let currentPhase = 1;
+    if (completedWorkouts.length > 0) {
+      const phases = completedWorkouts.map(w => w.phase);
+      currentPhase = Math.max(...phases);
+    }
+    dom.statsCurrentPhase.textContent = `Fase ${currentPhase} (Grátis)`;
+    dom.statsCurrentPhase.style.color = 'var(--color-primary)';
   }
-  dom.statsCurrentPhase.textContent = `Fase ${currentPhase}`;
   
   // Renderiza a lista de histórico
   dom.historyListContainer.innerHTML = '';
@@ -607,3 +630,80 @@ function showToast(message) {
     dom.toast.classList.remove('show');
   }, 3500);
 }
+
+// -------------------------------------------------------------
+// Gerenciamento do Paywall Premium e Compras
+// -------------------------------------------------------------
+const paywallDOM = {
+  modal: document.getElementById('paywall-modal'),
+  stepOffer: document.getElementById('paywall-step-offer'),
+  stepPix: document.getElementById('paywall-step-pix'),
+  btnClose: document.getElementById('btn-close-paywall'),
+  btnPayPix: document.getElementById('btn-pay-pix'),
+  btnConfirm: document.getElementById('btn-confirm-payment'),
+  btnCopy: document.getElementById('btn-copy-pix'),
+  btnBack: document.getElementById('btn-back-offer'),
+  pixKeyText: document.getElementById('pix-key-text')
+};
+
+function openPaywall() {
+  if (!paywallDOM.modal) return;
+  paywallDOM.stepOffer.style.display = 'block';
+  paywallDOM.stepPix.style.display = 'none';
+  paywallDOM.modal.classList.add('active');
+  audioEngine.init();
+  audioEngine.speak("Desbloqueie a versão premium para acessar esta etapa!");
+}
+
+function closePaywall() {
+  if (!paywallDOM.modal) return;
+  paywallDOM.modal.classList.remove('active');
+}
+
+// Vincula eventos do Paywall
+if (paywallDOM.modal) {
+  paywallDOM.btnClose.addEventListener('click', closePaywall);
+  
+  // Ir para tela do Pix
+  paywallDOM.btnPayPix.addEventListener('click', () => {
+    paywallDOM.stepOffer.style.display = 'none';
+    paywallDOM.stepPix.style.display = 'block';
+  });
+  
+  // Copiar chave Pix
+  paywallDOM.btnCopy.addEventListener('click', () => {
+    paywallDOM.pixKeyText.select();
+    paywallDOM.pixKeyText.setSelectionRange(0, 99999); // Para mobile
+    navigator.clipboard.writeText(paywallDOM.pixKeyText.value).then(() => {
+      paywallDOM.btnCopy.textContent = "Copiado!";
+      showToast("Chave Pix copiada para a área de transferência!");
+      setTimeout(() => {
+        paywallDOM.btnCopy.textContent = "Copiar Código";
+      }, 2000);
+    }).catch(err => {
+      console.error('Erro ao copiar chave:', err);
+    });
+  });
+  
+  // Voltar para a oferta
+  paywallDOM.btnBack.addEventListener('click', () => {
+    paywallDOM.stepOffer.style.display = 'block';
+    paywallDOM.stepPix.style.display = 'none';
+  });
+  
+  // Simular confirmação de pagamento Pix
+  paywallDOM.btnConfirm.addEventListener('click', () => {
+    isPremium = true;
+    localStorage.setItem('apenascorrer_premium', 'true');
+    closePaywall();
+    
+    // Feedback de voz e visual
+    audioEngine.init();
+    audioEngine.speak("Parabéns! Seu pagamento foi confirmado. Agora você é um membro premium do Apenas Correr! Todos os treinos foram liberados.");
+    
+    showToast('Acesso Premium Ativado! Bons treinos!');
+    renderCalendar();
+    updateProgressStats();
+  });
+}
+

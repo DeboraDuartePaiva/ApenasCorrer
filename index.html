@@ -166,6 +166,75 @@
   <!-- Toast de notificações -->
   <div class="toast" id="toast-message">Treino concluído com sucesso!</div>
 
+  <!-- Modal de Paywall Premium -->
+  <div id="paywall-modal" class="modal-overlay">
+    <div class="modal-card">
+      <button class="modal-close-btn" id="btn-close-paywall">&times;</button>
+      
+      <!-- Passo 1: Oferta Premium -->
+      <div id="paywall-step-offer">
+        <div class="premium-badge">PREMIUM 👑</div>
+        <h2>Desbloqueie sua Evolução</h2>
+        <p class="modal-subtitle">Conclua o desafio dos 5km com o programa completo!</p>
+        
+        <ul class="premium-features">
+          <li><span>🔥</span> 24 treinos guiados por áudio (Semanas 5 a 12)</li>
+          <li><span>⏱️</span> Desafios finais de 3km e 5km direto</li>
+          <li><span>🎵</span> Batidas rítmicas avançadas de corrida (Electro e Lo-Fi)</li>
+          <li><span>💾</span> Progresso salvo permanentemente no celular</li>
+        </ul>
+        
+        <div class="price-box">
+          <span class="old-price">De R$ 49,90</span>
+          <span class="new-price">R$ 29,90 <small>Valor Único</small></span>
+        </div>
+        
+        <button class="btn-pay-pix" id="btn-pay-pix">Quero Ser Premium (PIX)</button>
+      </div>
+      
+      <!-- Passo 2: QR Code Pix Simulado -->
+      <div id="paywall-step-pix" style="display: none;">
+        <h2>Pagamento via Pix</h2>
+        <p class="modal-subtitle">Escaneie o QR Code ou copie a chave Pix abaixo</p>
+        
+        <div class="pix-qr-code">
+          <svg viewBox="0 0 100 100" width="160" height="160">
+            <!-- Representação gráfica de um QR Code -->
+            <rect x="0" y="0" width="30" height="30" fill="currentColor"/>
+            <rect x="5" y="5" width="20" height="20" fill="#1b1d26"/>
+            <rect x="10" y="10" width="10" height="10" fill="currentColor"/>
+            
+            <rect x="70" y="0" width="30" height="30" fill="currentColor"/>
+            <rect x="75" y="5" width="20" height="20" fill="#1b1d26"/>
+            <rect x="80" y="10" width="10" height="10" fill="currentColor"/>
+            
+            <rect x="0" y="70" width="30" height="30" fill="currentColor"/>
+            <rect x="5" y="75" width="20" height="20" fill="#1b1d26"/>
+            <rect x="10" y="80" width="10" height="10" fill="currentColor"/>
+            
+            <!-- Blocos randômicos simulando dados -->
+            <rect x="40" y="0" width="10" height="20" fill="currentColor"/>
+            <rect x="55" y="10" width="10" height="10" fill="currentColor"/>
+            <rect x="40" y="35" width="15" height="15" fill="currentColor"/>
+            <rect x="15" y="45" width="15" height="15" fill="currentColor"/>
+            <rect x="65" y="45" width="25" height="10" fill="currentColor"/>
+            <rect x="40" y="70" width="20" height="15" fill="currentColor"/>
+            <rect x="70" y="70" width="15" height="30" fill="currentColor"/>
+          </svg>
+        </div>
+        
+        <div class="pix-key-container">
+          <span class="pix-key-label">Chave Copia e Cola:</span>
+          <input type="text" class="pix-key-value" id="pix-key-text" value="00020126360014br.gov.bcb.pix0114apenascorrer5km5204000053039865802BR5912ApenasCorrer6009SaoPaulo62070503***6304CA1A" readonly>
+          <button class="btn-copy-pix" id="btn-copy-pix">Copiar Código</button>
+        </div>
+        
+        <button class="btn-confirm-payment" id="btn-confirm-payment">Simular Confirmação de Pagamento</button>
+        <button class="btn-back-offer" id="btn-back-offer">Voltar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Script principal do App -->
   <script type="module" src="./js/app.js"></script>
 </body>
