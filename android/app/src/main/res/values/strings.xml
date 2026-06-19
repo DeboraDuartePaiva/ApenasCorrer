@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ApenasCorrer</string>
+    <string name="title_activity_main">ApenasCorrer</string>
+    <string name="package_name">com.deboradp.apenascorrer</string>
+    <string name="custom_url_scheme">com.deboradp.apenascorrer</string>
+</resources>
