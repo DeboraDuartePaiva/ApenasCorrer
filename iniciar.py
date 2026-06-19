@@ -12,7 +12,7 @@ except Exception:
     pass
 
 PORT = 8000
-DIRECTORY = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'www')
+DIRECTORY = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'docs')
 
 def get_local_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
