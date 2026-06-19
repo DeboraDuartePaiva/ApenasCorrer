@@ -1026,7 +1026,8 @@ async function updateCloudPremium(status) {
   try {
     const { error } = await supabase
       .from('profiles')
-      .upsert({ id: currentUser.id, is_premium: status });
+      .update({ is_premium: status })
+      .eq('id', currentUser.id);
       
     if (error) console.error('Erro ao atualizar premium:', error);
   } catch (e) {
